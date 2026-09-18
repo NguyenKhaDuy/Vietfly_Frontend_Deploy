@@ -1,0 +1,123 @@
+name: Deploy VietFly frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full 40-character frontend commit SHA
+        required: true
+        type: string
+      deploy:
+        description: Deploy after successful build
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vietfly-frontend-production
+  cancel-in-progress: false
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      VITE_API_BASE_URL: https://api.vietfly.com.vn
+
+    steps:
+      - name: Validate requested commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Checkout requested source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.release_sha }}
+          persist-credentials: false
+
+      - name: Verify checked-out commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install and check
+        run: |
+          npm ci --include=dev
+          npm run lint
+
+      - name: Build production frontend
+        run: |
+          npm run build -- --mode production
+          test -f dist/index.html
+          test -d dist/assets
+
+      - name: Package build
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/frontend.tar.gz" -C dist .
+          ARCHIVE_SHA=$(sha256sum "$RUNNER_TEMP/frontend.tar.gz" | cut -d ' ' -f 1)
+          echo "ARCHIVE_SHA=$ARCHIVE_SHA" >> "$GITHUB_ENV"
+          {
+            echo "Commit: $RELEASE_SHA"
+            echo "Archive SHA256: $ARCHIVE_SHA"
+            echo "API: $VITE_API_BASE_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy frontend
+        if: ${{ inputs.deploy }}
+        shell: bash
+        env:
+          FRONTEND_SSH_KEY: ${{ secrets.FRONTEND_SSH_KEY }}
+          FRONTEND_KNOWN_HOSTS: ${{ secrets.FRONTEND_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$FRONTEND_SSH_KEY"
+          test -n "$FRONTEND_KNOWN_HOSTS"
+
+          install -d -m 700 "$RUNNER_TEMP/frontend-ssh"
+          KEY="$RUNNER_TEMP/frontend-ssh/key"
+          HOSTS="$RUNNER_TEMP/frontend-ssh/known_hosts"
+
+          printf '%s\n' "$FRONTEND_SSH_KEY" > "$KEY"
+          printf '%s\n' "$FRONTEND_KNOWN_HOSTS" > "$HOSTS"
+          chmod 600 "$KEY" "$HOSTS"
+          trap 'rm -f "$KEY" "$HOSTS"' EXIT
+
+          ssh -T -i "$KEY" -p 24700 \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOSTS" \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
+            frontend-release@103.166.182.60 \
+            "deploy $RELEASE_SHA $ARCHIVE_SHA" \
+            < "$RUNNER_TEMP/frontend.tar.gz"
+
+      - name: Check public website
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 30 \
+            -H 'Cache-Control: no-cache' \
+            "https://www.vietfly.com.vn/index.html?commit=$RELEASE_SHA" \
+            -o "$RUNNER_TEMP/public-index.html"
+          cmp dist/index.html "$RUNNER_TEMP/public-index.html"
+          echo "Public website index matches the build." >> "$GITHUB_STEP_SUMMARY"
