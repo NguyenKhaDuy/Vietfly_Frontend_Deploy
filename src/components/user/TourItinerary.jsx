@@ -2,12 +2,42 @@ import { Clock3, MapPin } from "lucide-react";
 
 import SectionTitle from "./SectionTitle";
 
+function parseDateTime(value) {
+  if (!value) return 0;
+
+  // Backend: dd/MM/yyyy HH:mm:ss
+  const match = String(value).match(
+    /^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/,
+  );
+
+  if (!match) {
+    return 0;
+  }
+
+  const [, day, month, year, hour = "00", minute = "00", second = "00"] = match;
+
+  return new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  ).getTime();
+}
+
 export default function TourItinerary({ itinerary = [] }) {
-  const itineraryList = Array.isArray(itinerary) ? itinerary : [];
+  const itineraryList = Array.isArray(itinerary)
+    ? [...itinerary].sort(
+        (a, b) => parseDateTime(a?.createdAt) - parseDateTime(b?.createdAt),
+      )
+    : [];
 
   if (itineraryList.length === 0) {
     return null;
   }
+
+  console.log("ITINERARY SAU KHI SORT:", itineraryList);
 
   return (
     <section className="border-b border-slate-100 py-12">
@@ -23,7 +53,12 @@ export default function TourItinerary({ itinerary = [] }) {
 
         <div className="space-y-12">
           {itineraryList.map((day, dayIndex) => {
-            const sessions = Array.isArray(day?.sessions) ? day.sessions : [];
+            const sessions = Array.isArray(day?.sessions)
+              ? [...day.sessions].sort(
+                  (a, b) =>
+                    parseDateTime(a?.createdAt) - parseDateTime(b?.createdAt),
+                )
+              : [];
 
             const dayDescription = day?.description || "";
 
@@ -85,7 +120,7 @@ export default function TourItinerary({ itinerary = [] }) {
                 {sessions.length > 0 && (
                   <div className="mt-6 space-y-5 pl-0 md:pl-[60px]">
                     {sessions.map((session, sessionIndex) => {
-                      const image = session?.image || null;
+                      const image = session?.image || session?.imageUrl || null;
 
                       const title =
                         session?.title || `Hoạt động ${sessionIndex + 1}`;

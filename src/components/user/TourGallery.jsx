@@ -10,272 +10,461 @@ export default function TourGallery({
 }) {
   const imageList = Array.isArray(images) ? images : [];
 
-  const thumbnailIndex = imageList.findIndex(
-    (image) => image?.thumbnail === true,
-  );
+  const getImageUrl = (image) => {
+    return (
+      image?.imgaeUrl || image?.imageUrl || image?.image || image?.url || null
+    );
+  };
 
-  const currentIndex =
+  /*
+   * ============================================================
+   * SẮP XẾP ẢNH
+   * ============================================================
+   *
+   * Ảnh thumbnail luôn đứng đầu.
+   * Các ảnh còn lại giữ nguyên thứ tự backend trả về.
+   */
+  const orderedImages = [...imageList].sort((a, b) => {
+    const aThumbnail = a?.thumbnail === true ? 1 : 0;
+    const bThumbnail = b?.thumbnail === true ? 1 : 0;
+
+    return bThumbnail - aThumbnail;
+  });
+
+  /*
+   * ============================================================
+   * XÁC ĐỊNH ẢNH ĐANG ACTIVE
+   * ============================================================
+   *
+   * activeImage vẫn là index của imageList gốc.
+   */
+  const activeOriginalImage =
     activeImage !== null &&
     activeImage !== undefined &&
     activeImage >= 0 &&
     activeImage < imageList.length
-      ? activeImage
-      : thumbnailIndex >= 0
-        ? thumbnailIndex
-        : 0;
+      ? imageList[activeImage]
+      : null;
 
-  const currentImage = imageList[currentIndex];
-
-  const mainImageUrl = currentImage?.imgaeUrl || null;
-
-  const thumbnailImages = imageList.filter(
-    (_, index) => index !== currentIndex,
+  const thumbnailIndex = orderedImages.findIndex(
+    (image) => image?.thumbnail === true,
   );
 
-  if (imageList.length === 0) {
+  const orderedCurrentIndex = activeOriginalImage
+    ? orderedImages.findIndex(
+        (image) => image?.idImage === activeOriginalImage?.idImage,
+      )
+    : thumbnailIndex >= 0
+      ? thumbnailIndex
+      : 0;
+
+  const currentIndex = orderedCurrentIndex >= 0 ? orderedCurrentIndex : 0;
+
+  const currentImage = orderedImages[currentIndex];
+  const mainImageUrl = getImageUrl(currentImage);
+
+  /*
+   * ============================================================
+   * KHÔNG CÓ ẢNH
+   * ============================================================
+   */
+  if (orderedImages.length === 0) {
     return (
       <div
         className="
           flex
-          h-[500px]
+          min-h-[520px]
           w-full
           items-center
           justify-center
-          overflow-hidden
           rounded-3xl
-          bg-slate-100
+          border
+          border-slate-200
+          bg-white
         "
       >
         <div className="flex flex-col items-center gap-3 text-slate-400">
-          <ImageOff size={48} strokeWidth={1.5} />
-          <span className="text-sm font-medium">
-            Chưa có hình ảnh
-          </span>
+          <ImageOff size={46} strokeWidth={1.5} />
+
+          <span className="text-sm font-medium">Chưa có hình ảnh</span>
         </div>
       </div>
     );
   }
 
+  /*
+   * ============================================================
+   * LẤY INDEX GỐC
+   * ============================================================
+   */
+  const getOriginalIndex = (image) => {
+    return imageList.findIndex((item) => item?.idImage === image?.idImage);
+  };
+
   return (
-    <div
-      className="
-        grid
-        h-[500px]
-        grid-cols-1
-        gap-3
-        overflow-hidden
-        rounded-3xl
-        lg:grid-cols-4
-      "
-    >
+    <div className="w-full">
+      {/* ======================================================
+          MAIN GALLERY
+      ======================================================= */}
       <div
         className="
-          group
-          relative
           overflow-hidden
-          bg-slate-100
-          lg:col-span-2
-          lg:row-span-2
+          rounded-3xl
+          border
+          border-slate-200
+          bg-white
+          shadow-sm
         "
       >
-        {mainImageUrl ? (
-          <img
-            src={mainImageUrl}
-            alt="Ảnh tour"
-            className="
-              h-full
-              w-full
-              object-cover
-              transition
-              duration-700
-              group-hover:scale-105
-            "
-          />
-        ) : (
-          <div
-            className="
-              flex
-              h-full
-              w-full
-              items-center
-              justify-center
-              text-slate-400
-            "
-          >
-            <div className="flex flex-col items-center gap-2">
-              <ImageOff size={40} />
-              <span className="text-sm">
-                Không có hình ảnh
-              </span>
-            </div>
-          </div>
-        )}
-
+        {/* ====================================================
+            MAIN IMAGE AREA
+        ===================================================== */}
         <div
           className="
-            pointer-events-none
-            absolute
-            inset-0
-            bg-gradient-to-t
-            from-black/40
-            via-transparent
-            to-transparent
+            relative
+            flex
+            h-[500px]
+            w-full
+            items-center
+            justify-center
+            overflow-hidden
+            bg-slate-50
+            sm:h-[540px]
+            lg:h-[580px]
           "
-        />
+        >
+          {/* ==================================================
+              BACKGROUND BLUR
+          =================================================== */}
+          {mainImageUrl && (
+            <div
+              className="
+                pointer-events-none
+                absolute
+                inset-0
+                overflow-hidden
+              "
+            >
+              <img
+                src={mainImageUrl}
+                alt=""
+                aria-hidden="true"
+                className="
+                  h-full
+                  w-full
+                  scale-110
+                  object-cover
+                  opacity-[0.07]
+                  blur-3xl
+                "
+              />
 
-        {imageList.length > 1 && (
-          <>
-            <GalleryButton
-              position="left"
+              <div
+                className="
+                  absolute
+                  inset-0
+                  bg-slate-50/90
+                "
+              />
+            </div>
+          )}
+
+          {/* ==================================================
+              MAIN IMAGE
+          =================================================== */}
+          {mainImageUrl ? (
+            <div
+              className="
+                relative
+                z-10
+                flex
+                h-full
+                w-full
+                items-center
+                justify-center
+                px-8
+                py-5
+                sm:px-10
+                sm:py-6
+                lg:px-12
+                lg:py-7
+              "
+            >
+              <img
+                src={mainImageUrl}
+                alt="Ảnh tour"
+                className="
+                  block
+                  max-h-full
+                  max-w-full
+                  object-contain
+                  drop-shadow-[0_18px_35px_rgba(15,23,42,0.14)]
+                  transition-all
+                  duration-500
+                "
+              />
+            </div>
+          ) : (
+            <div
+              className="
+                relative
+                z-10
+                flex
+                flex-col
+                items-center
+                gap-3
+                text-slate-400
+              "
+            >
+              <ImageOff size={46} strokeWidth={1.5} />
+
+              <span className="text-sm font-medium">Không có hình ảnh</span>
+            </div>
+          )}
+
+          {/* ==================================================
+              PREVIOUS
+          =================================================== */}
+          {orderedImages.length > 1 && (
+            <button
+              type="button"
               onClick={onPrevious}
+              aria-label="Ảnh trước"
+              className="
+                absolute
+                left-4
+                top-1/2
+                z-30
+                flex
+                h-10
+                w-10
+                -translate-y-1/2
+                items-center
+                justify-center
+                rounded-full
+                border
+                border-slate-200
+                bg-white/95
+                text-slate-700
+                shadow-md
+                backdrop-blur
+                transition-all
+                duration-200
+                hover:scale-105
+                hover:border-slate-300
+                hover:bg-white
+                hover:text-cyan-600
+                sm:left-5
+              "
             >
-              <ChevronLeft size={20} />
-            </GalleryButton>
+              <ChevronLeft size={21} strokeWidth={2} />
+            </button>
+          )}
 
-            <GalleryButton
-              position="right"
+          {/* ==================================================
+              NEXT
+          =================================================== */}
+          {orderedImages.length > 1 && (
+            <button
+              type="button"
               onClick={onNext}
+              aria-label="Ảnh tiếp theo"
+              className="
+                absolute
+                right-4
+                top-1/2
+                z-30
+                flex
+                h-10
+                w-10
+                -translate-y-1/2
+                items-center
+                justify-center
+                rounded-full
+                border
+                border-slate-200
+                bg-white/95
+                text-slate-700
+                shadow-md
+                backdrop-blur
+                transition-all
+                duration-200
+                hover:scale-105
+                hover:border-slate-300
+                hover:bg-white
+                hover:text-cyan-600
+                sm:right-5
+              "
             >
-              <ChevronRight size={20} />
-            </GalleryButton>
-          </>
-        )}
+              <ChevronRight size={21} strokeWidth={2} />
+            </button>
+          )}
 
-        {imageList.length > 1 && (
-          <button
-            type="button"
-            onClick={onOpenGallery}
+          {/* ==================================================
+              COUNTER
+          =================================================== */}
+          <div
             className="
               absolute
               bottom-5
-              right-5
-              z-10
-              rounded-xl
-              bg-black/60
-              px-4
-              py-2
-              text-sm
+              left-5
+              z-30
+              rounded-lg
+              border
+              border-slate-200
+              bg-white/95
+              px-3
+              py-1.5
+              text-xs
               font-semibold
-              text-white
+              text-slate-700
+              shadow-sm
               backdrop-blur
-              transition
-              hover:bg-black/80
             "
           >
-            Xem tất cả ảnh
-          </button>
+            {currentIndex + 1}
+            <span className="mx-1 text-slate-300">/</span>
+            {orderedImages.length}
+          </div>
+
+          {/* ==================================================
+              VIEW ALL
+          =================================================== */}
+          {orderedImages.length > 1 && (
+            <button
+              type="button"
+              onClick={onOpenGallery}
+              className="
+                absolute
+                bottom-5
+                right-5
+                z-30
+                rounded-lg
+                bg-slate-900
+                px-4
+                py-2
+                text-sm
+                font-semibold
+                text-white
+                shadow-md
+                transition-all
+                duration-200
+                hover:bg-slate-800
+                hover:shadow-lg
+              "
+            >
+              Xem tất cả ảnh
+            </button>
+          )}
+        </div>
+
+        {/* ====================================================
+            THUMBNAIL STRIP
+        ===================================================== */}
+        {orderedImages.length > 1 && (
+          <div
+            className="
+              border-t
+              border-slate-100
+              bg-white
+              px-4
+              py-3
+              sm:px-5
+            "
+          >
+            <div
+              className="
+                flex
+                gap-3
+                overflow-x-auto
+                pb-1
+                scrollbar-thin
+                scrollbar-track-transparent
+                scrollbar-thumb-slate-200
+              "
+            >
+              {orderedImages.map((image, index) => {
+                const imageUrl = getImageUrl(image);
+
+                if (!imageUrl) {
+                  return null;
+                }
+
+                const isActive = index === currentIndex;
+                const originalIndex = getOriginalIndex(image);
+
+                return (
+                  <button
+                    key={image?.idImage || `tour-image-${index}`}
+                    type="button"
+                    onClick={() => onImageChange?.(originalIndex)}
+                    aria-label={`Xem ảnh ${index + 1}`}
+                    className={`
+                      group
+                      relative
+                      h-[82px]
+                      w-[116px]
+                      shrink-0
+                      overflow-hidden
+                      rounded-xl
+                      bg-white
+                      p-0.5
+                      transition-all
+                      duration-200
+                      ${
+                        isActive
+                          ? "border border-cyan-500 shadow-sm"
+                          : "border border-slate-200 hover:border-slate-300 hover:shadow-sm"
+                      }
+                    `}
+                  >
+                    <div
+                      className="
+                        flex
+                        h-full
+                        w-full
+                        items-center
+                        justify-center
+                        overflow-hidden
+                        rounded-[9px]
+                        bg-slate-50
+                      "
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`Ảnh tour ${index + 1}`}
+                        className="
+                          h-full
+                          w-full
+                          object-cover
+                          transition-transform
+                          duration-300
+                          group-hover:scale-[1.04]
+                        "
+                      />
+                    </div>
+
+                    {/* Active indicator - chỉ 1px */}
+                    {isActive && (
+                      <div
+                        className="
+                          pointer-events-none
+                          absolute
+                          inset-0
+                          rounded-[10px]
+                          ring-1
+                          ring-inset
+                          ring-cyan-500
+                        "
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
-
-      {thumbnailImages.slice(0, 4).map((image, index) => {
-        if (!image?.imgaeUrl) {
-          return null;
-        }
-
-        const realIndex = imageList.findIndex(
-          (item) => item?.idImage === image?.idImage,
-        );
-
-        return (
-          <button
-            key={
-              image?.idImage ||
-              `tour-image-${index}`
-            }
-            type="button"
-            onClick={() =>
-              onImageChange?.(realIndex)
-            }
-            className="
-              group
-              relative
-              hidden
-              overflow-hidden
-              bg-slate-100
-              lg:block
-            "
-          >
-            <img
-              src={image.imgaeUrl}
-              alt={`Ảnh tour ${index + 1}`}
-              className="
-                h-full
-                w-full
-                object-cover
-                transition
-                duration-500
-                group-hover:scale-105
-              "
-            />
-
-            {index === 3 &&
-              thumbnailImages.length > 4 && (
-                <div
-                  className="
-                    absolute
-                    inset-0
-                    flex
-                    items-center
-                    justify-center
-                    bg-black/45
-                  "
-                >
-                  <span
-                    className="
-                      rounded-xl
-                      bg-white/90
-                      px-4
-                      py-2
-                      text-sm
-                      font-bold
-                      text-slate-800
-                      shadow-lg
-                    "
-                  >
-                    Xem thêm ảnh
-                  </span>
-                </div>
-              )}
-          </button>
-        );
-      })}
     </div>
-  );
-}
-
-function GalleryButton({
-  position,
-  children,
-  onClick,
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`
-        absolute
-        ${position}-4
-        top-1/2
-        z-20
-        flex
-        h-10
-        w-10
-        -translate-y-1/2
-        items-center
-        justify-center
-        rounded-full
-        bg-white/90
-        text-slate-700
-        opacity-0
-        shadow-lg
-        transition
-        duration-200
-        hover:scale-105
-        hover:bg-white
-        group-hover:opacity-100
-      `}
-    >
-      {children}
-    </button>
   );
 }
