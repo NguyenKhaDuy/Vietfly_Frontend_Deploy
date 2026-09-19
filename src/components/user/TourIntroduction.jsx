@@ -10,6 +10,7 @@ export default function TourIntroduction({ tour }) {
 
       <p
         className="
+        text-justify
           mt-6
           text-[15px]
           leading-8

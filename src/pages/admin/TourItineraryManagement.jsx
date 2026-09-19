@@ -19,17 +19,21 @@ export default function TourItineraryManagement() {
   const { idTour } = useParams();
 
   const [tour, setTour] = useState(location.state?.tour || null);
+
   const [loading, setLoading] = useState(false);
 
   const [showItineraryModal, setShowItineraryModal] = useState(false);
+
   const [editingItinerary, setEditingItinerary] = useState(null);
 
   const [showDeleteItineraryModal, setShowDeleteItineraryModal] =
     useState(false);
 
   const [deletingItinerary, setDeletingItinerary] = useState(null);
+
   const [deletingItineraryLoading, setDeletingItineraryLoading] =
     useState(false);
+
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   const [selectedItinerary, setSelectedItinerary] = useState(null);
@@ -43,6 +47,9 @@ export default function TourItineraryManagement() {
   const [deletingDetailLoading, setDeletingDetailLoading] = useState(false);
 
   const [notification, setNotification] = useState(null);
+
+  const [scrollToItineraryId, setScrollToItineraryId] = useState(null);
+
 
   const showNotification = (type, title, message) => {
     setNotification({
@@ -61,7 +68,7 @@ export default function TourItineraryManagement() {
 
     return () => clearTimeout(timer);
   }, [notification]);
-  
+
   const parseCreatedAt = (dateString) => {
     if (!dateString) return 0;
 
@@ -83,6 +90,7 @@ export default function TourItineraryManagement() {
       return 0;
     }
   };
+
 
   const loadItineraries = async () => {
     if (!idTour) return;
@@ -107,7 +115,6 @@ export default function TourItineraryManagement() {
         tourItinerariesDTOS: sortedItineraries,
       }));
     } catch (error) {
-
       const message =
         error.response?.data?.message ||
         error.response?.data?.error ||
@@ -119,13 +126,37 @@ export default function TourItineraryManagement() {
     }
   };
 
+
   useEffect(() => {
     loadItineraries();
   }, [idTour]);
 
+  useEffect(() => {
+    if (!scrollToItineraryId) return;
+
+    const timer = setTimeout(() => {
+      const element = document.getElementById(
+        `itinerary-${scrollToItineraryId}`,
+      );
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+
+      setScrollToItineraryId(null);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [scrollToItineraryId, itinerariesLength(tour)]);
+
+
   const itineraries = Array.isArray(tour?.tourItinerariesDTOS)
     ? tour.tourItinerariesDTOS
     : [];
+
 
   const totalDetails = itineraries.reduce((total, itinerary) => {
     const details = itinerary.tourItinerariesDetailDTOS;
@@ -133,10 +164,12 @@ export default function TourItineraryManagement() {
     return total + (Array.isArray(details) ? details.length : 0);
   }, 0);
 
+
   const handleAddItinerary = () => {
     setEditingItinerary(null);
     setShowItineraryModal(true);
   };
+
 
   const handleEditItinerary = (itinerary) => {
     setEditingItinerary(itinerary);
@@ -171,7 +204,6 @@ export default function TourItineraryManagement() {
         "Lịch trình đã được xóa khỏi tour.",
       );
     } catch (error) {
-
       const message =
         error.response?.data?.message ||
         error.response?.data?.error ||
@@ -192,16 +224,17 @@ export default function TourItineraryManagement() {
 
   const handleSubmitItinerary = async (formData) => {
     try {
-      let response;
-
       if (editingItinerary) {
-        // UPDATE
-        response = await api.put("/api/tour-itinerary", formData);
+        await api.put("/api/tour-itinerary", formData);
+
+        const itineraryId = editingItinerary.idTourItineraries;
 
         setShowItineraryModal(false);
         setEditingItinerary(null);
 
         await loadItineraries();
+
+        setScrollToItineraryId(itineraryId);
 
         showNotification(
           "success",
@@ -209,8 +242,7 @@ export default function TourItineraryManagement() {
           "Thông tin lịch trình đã được cập nhật.",
         );
       } else {
-        // ADD
-        response = await api.post("/api/tour-itinerary", formData);
+        await api.post("/api/tour-itinerary", formData);
 
         setShowItineraryModal(false);
         setEditingItinerary(null);
@@ -224,7 +256,6 @@ export default function TourItineraryManagement() {
         );
       }
     } catch (error) {
-
       const message =
         error.response?.data?.message ||
         error.response?.data?.error ||
@@ -248,7 +279,6 @@ export default function TourItineraryManagement() {
   };
 
   const handleAddDetail = (itinerary) => {
-
     setSelectedItinerary(itinerary);
     setEditingDetail(null);
     setShowDetailModal(true);
@@ -265,6 +295,7 @@ export default function TourItineraryManagement() {
     setDeletingDetail(detail);
     setShowDeleteDetailModal(true);
   };
+
   const handleConfirmDeleteDetail = async () => {
     if (!deletingDetail?.idTourItinerariesDetail) {
       return;
@@ -274,19 +305,15 @@ export default function TourItineraryManagement() {
       setDeletingDetailLoading(true);
 
       const detailId = deletingDetail.idTourItinerariesDetail;
-      const response = await api.delete(
-        `/api/tour-itinerary-detail/id=${detailId}`,
-      );
 
-      // Đóng modal xác nhận
+      await api.delete(`/api/tour-itinerary-detail/id=${detailId}`);
+
       setShowDeleteDetailModal(false);
       setDeletingDetail(null);
       setSelectedItinerary(null);
 
-      // Load lại danh sách itinerary + detail
       await loadItineraries();
 
-      // Thông báo thành công
       showNotification(
         "success",
         "Xóa hoạt động thành công",
@@ -304,6 +331,7 @@ export default function TourItineraryManagement() {
     }
   };
 
+
   const closeDeleteDetailModal = () => {
     if (deletingDetailLoading) return;
 
@@ -311,33 +339,81 @@ export default function TourItineraryManagement() {
     setDeletingDetail(null);
   };
 
-  const handleSubmitDetail = async (formData) => {
+
+
+  const handleSubmitDetail = async (data) => {
     try {
-      let response;
+    
 
       if (editingDetail) {
-        response = await api.put("/api/tour-itinerary-detail", formData);
-      } else {
-        response = await api.post("/api/tour-itinerary-detail", formData);
+        const targetItineraryId = selectedItinerary?.idTourItineraries;
+
+        await api.put("/api/tour-itinerary-detail", data);
+
+        closeDetailModal();
+
+        await loadItineraries();
+
+        // ĐỨNG LẠI ĐÚNG NGÀY ĐANG SỬA
+        setScrollToItineraryId(targetItineraryId);
+
+        showNotification(
+          "success",
+          "Cập nhật hoạt động thành công",
+          "Thông tin hoạt động đã được cập nhật.",
+        );
+
+        return;
       }
 
+      if (!selectedItinerary?.idTourItineraries) {
+        throw new Error("Không xác định được lịch trình.");
+      }
+
+      const targetItineraryId = selectedItinerary.idTourItineraries;
+
+      const formData = new FormData();
+
+      formData.append("idTourItinerary", targetItineraryId);
+
+      const details = Array.isArray(data) ? data : [];
+
+      details.forEach((item, index) => {
+        formData.append(
+          `tourItinerariesDetails[${index}].title`,
+          item.title?.trim() || "",
+        );
+
+        formData.append(
+          `tourItinerariesDetails[${index}].description`,
+          item.description?.trim() || "",
+        );
+
+        if (item.image instanceof File) {
+          formData.append(`tourItinerariesDetails[${index}].image`, item.image);
+        }
+      });
+
+      await api.post("/api/tour-itinerary-detail", formData);
+
       closeDetailModal();
+
       await loadItineraries();
+
+      setScrollToItineraryId(targetItineraryId);
 
       showNotification(
         "success",
-        editingDetail
-          ? "Cập nhật hoạt động thành công"
-          : "Thêm hoạt động thành công",
-        editingDetail
-          ? "Thông tin hoạt động đã được cập nhật."
-          : "Hoạt động đã được thêm vào lịch trình.",
+        "Thêm hoạt động thành công",
+        `${details.length} hoạt động đã được thêm vào lịch trình.`,
       );
     } catch (error) {
+      console.error("Submit detail error:", error);
 
       const message =
         error.response?.data?.message ||
         error.response?.data?.error ||
+        error.message ||
         "Không thể lưu chi tiết lịch trình.";
 
       showNotification(
@@ -352,11 +428,13 @@ export default function TourItineraryManagement() {
     }
   };
 
+
   const closeDetailModal = () => {
     setShowDetailModal(false);
     setSelectedItinerary(null);
     setEditingDetail(null);
   };
+
 
   if (!tour) {
     return (
@@ -389,7 +467,7 @@ export default function TourItineraryManagement() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      
+
       {notification && (
         <div className="pointer-events-none fixed right-5 top-5 z-[99999] w-[380px] max-w-[calc(100vw-40px)]">
           <div className="pointer-events-auto">
@@ -440,8 +518,6 @@ export default function TourItineraryManagement() {
             </div>
           </div>
 
-          {/* ADD ITINERARY */}
-
           <button
             type="button"
             onClick={handleAddItinerary}
@@ -471,7 +547,7 @@ export default function TourItineraryManagement() {
             </div>
           </div>
 
-          {/* HOẠT ĐỘNG */}
+          {/* TỔNG HOẠT ĐỘNG */}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-3">
@@ -489,6 +565,7 @@ export default function TourItineraryManagement() {
             </div>
           </div>
         </div>
+
         {loading ? (
           <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-cyan-500" />
@@ -519,16 +596,21 @@ export default function TourItineraryManagement() {
         ) : (
           <div className="space-y-5">
             {itineraries.map((itinerary, index) => (
-              <ItineraryCard
+              <div
                 key={itinerary.idTourItineraries || `itinerary-${index}`}
-                itinerary={itinerary}
-                day={index + 1}
-                onEdit={handleEditItinerary}
-                onDelete={handleDeleteItinerary}
-                onAddDetail={handleAddDetail}
-                onEditDetail={handleEditDetail}
-                onDeleteDetail={handleDeleteDetail}
-              />
+                id={`itinerary-${itinerary.idTourItineraries}`}
+                className="scroll-mt-6"
+              >
+                <ItineraryCard
+                  itinerary={itinerary}
+                  day={index + 1}
+                  onEdit={handleEditItinerary}
+                  onDelete={handleDeleteItinerary}
+                  onAddDetail={handleAddDetail}
+                  onEditDetail={handleEditDetail}
+                  onDeleteDetail={handleDeleteDetail}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -542,7 +624,6 @@ export default function TourItineraryManagement() {
           onSubmit={handleSubmitItinerary}
         />
       )}
-
 
       {showDetailModal && selectedItinerary && (
         <ItineraryDetailModal
@@ -574,4 +655,10 @@ export default function TourItineraryManagement() {
       />
     </div>
   );
+}
+
+function itinerariesLength(tour) {
+  return Array.isArray(tour?.tourItinerariesDTOS)
+    ? tour.tourItinerariesDTOS.length
+    : 0;
 }
